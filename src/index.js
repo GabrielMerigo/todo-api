@@ -25,8 +25,9 @@ function checksExistsUserAccount(request, response, next) {
 
 app.post("/users", (request, response) => {
   const { name, username } = request.body;
+  const userAlreadyExists = users.find((user) => user.username === username);
 
-  if (name !== undefined && username !== undefined) {
+  if (name !== undefined && username !== undefined && !userAlreadyExists) {
     const user = {
       id: uuid(),
       name,
@@ -35,16 +36,17 @@ app.post("/users", (request, response) => {
     };
 
     users.push(user);
-    response.status(200).json(user);
+    response.status(201).json(user);
   } else {
-    response.status(400).json({ message: "Something happen" });
+    response.status(400).json({ error: "User Already Exists" });
+    response.body.error = "User Already Exists";
   }
 });
 
 app.get("/todos", checksExistsUserAccount, (request, response) => {
   const { username } = request;
   const user = findUser(users, username);
-  response.status(200).json(user.todos);
+  response.status(200).json([user]);
 });
 
 app.post("/todos", checksExistsUserAccount, (request, response) => {
@@ -59,24 +61,58 @@ app.post("/todos", checksExistsUserAccount, (request, response) => {
       deadline: new Date(deadline),
       created_at: new Date(),
     };
+
     const user = findUser(users, username);
     user.todos.push(todo);
-    response.status(200).json(user);
+    response.status(201).json(user);
   } else {
     response.status(400).json({ message: "something wrong" });
   }
 });
 
 app.put("/todos/:id", checksExistsUserAccount, (request, response) => {
-  // Complete aqui
+  const { username } = request;
+  const { title, deadline } = request.body;
+  const { id } = request.params;
+  const user = findUser(users, username);
+
+  if (title !== undefined && deadline !== undefined && user) {
+    const todo = user.todos.find((todo) => todo.id === id);
+    todo.deadline = new Date(deadline);
+    todo.title = title;
+    response.status(200).json(user);
+  } else {
+    response.status(400).json({ message: "Something wrong" });
+  }
 });
 
 app.patch("/todos/:id/done", checksExistsUserAccount, (request, response) => {
-  // Complete aqui
+  const { username } = request;
+  const user = findUser(users, username);
+  const { id } = request.params;
+
+  if (user) {
+    const todo = user.todos.find((todo) => todo.id === id);
+    todo.done = true;
+    response.status(200).json(user);
+  } else {
+    response.status(400).json({ message: "Something wrong" });
+  }
 });
 
 app.delete("/todos/:id", checksExistsUserAccount, (request, response) => {
-  // Complete aqui
+  const { username } = request;
+  const user = findUser(users, username);
+  const { id } = request.params;
+  const todosFiltered = user.todos.filter((todo) => todo.id !== id);
+  const todoFiltered = user.todos.find((todo) => todo.id === id);
+
+  if (user && todoFiltered) {
+    user.todos = todosFiltered;
+    response.status(204).json(user);
+  } else {
+    response.status(404).json({ message: "Something wrong" });
+  }
 });
 
 module.exports = app;
